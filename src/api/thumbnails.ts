@@ -10,32 +10,6 @@ type Thumbnail = {
   mediaType: string;
 };
 
-const videoThumbnails: Map<string, Thumbnail> = new Map();
-
-export async function handlerGetThumbnail(cfg: ApiConfig, req: BunRequest) {
-  const { videoId } = req.params as { videoId?: string };
-  if (!videoId) {
-    throw new BadRequestError("Invalid video ID");
-  }
-
-  const video = getVideo(cfg.db, videoId);
-  if (!video) {
-    throw new NotFoundError("Couldn't find video");
-  }
-
-  const thumbnail = videoThumbnails.get(videoId);
-  if (!thumbnail) {
-    throw new NotFoundError("Thumbnail not found");
-  }
-
-  return new Response(thumbnail.data, {
-    headers: {
-      "Content-Type": thumbnail.mediaType,
-      "Cache-Control": "no-store",
-    },
-  });
-}
-
 export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const { videoId } = req.params as { videoId?: string };
   if (!videoId) {
@@ -56,7 +30,7 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   if (video.userID !== userID) {
     throw new UserForbiddenError("User is not the owner of this video");
   }
-  
+
   const formData = await req.formData();
   const file = formData.get("thumbnail");
   if (!(file instanceof File)) {
@@ -68,16 +42,21 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new BadRequestError("Thumbnail file is too large");
   }
 
-
-  const thumbnail: Thumbnail = {
-    data: await file.arrayBuffer(),
-    mediaType: file.type,
+  const mediaType = file.type;
+  if (!mediaType) {
+    throw new BadRequestError("Missing Content-Type for thumbnail");
   }
 
-  videoThumbnails.set(videoId, thumbnail);
+  const arrayBuffer = await file.arrayBuffer();
+  if (!arrayBuffer) {
+    throw new Error("Error reading file data");
+  }
 
-  const thumbnailURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`;
-  video.thumbnailURL = thumbnailURL;
+  const buffer = Buffer.from(arrayBuffer);
+  const fileString = buffer.toString("base64");
+  const dataURL = `data:${mediaType};base64,${fileString}`
+
+  video.thumbnailURL = dataURL;
 
   updateVideo(cfg.db, video);
   return respondWithJSON(200, video);
