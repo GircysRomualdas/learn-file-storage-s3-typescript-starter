@@ -4,11 +4,8 @@ import { getVideo, updateVideo } from "../db/videos";
 import type { ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
-
-type Thumbnail = {
-  data: ArrayBuffer;
-  mediaType: string;
-};
+import { getFileType } from "./assets";
+import path from "path";
 
 export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const { videoId } = req.params as { videoId?: string };
@@ -52,11 +49,15 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new Error("Error reading file data");
   }
 
-  const buffer = Buffer.from(arrayBuffer);
-  const fileString = buffer.toString("base64");
-  const dataURL = `data:${mediaType};base64,${fileString}`
+  const fileType = getFileType(mediaType);
+  if (!fileType) {
+    throw new Error("Unsupported or invalid file type");
+  }
 
-  video.thumbnailURL = dataURL;
+  const filePath = path.join(cfg.assetsRoot, `/${videoId}.${fileType}`)
+  await Bun.write(filePath, arrayBuffer);
+
+  video.thumbnailURL = `http://localhost:${cfg.port}/assets/${videoId}.${fileType}`;
 
   updateVideo(cfg.db, video);
   return respondWithJSON(200, video);
