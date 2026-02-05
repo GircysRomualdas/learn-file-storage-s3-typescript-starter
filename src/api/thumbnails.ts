@@ -6,6 +6,7 @@ import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
 import { getFileType } from "./assets";
 import path from "path";
+import { randomBytes } from "crypto";
 
 export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const { videoId } = req.params as { videoId?: string };
@@ -57,10 +58,11 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new Error("Unsupported or invalid file type");
   }
 
-  const filePath = path.join(cfg.assetsRoot, `/${videoId}.${fileType}`)
+  const fileName = randomBytes(32).toString("base64url");
+  const filePath = path.join(cfg.assetsRoot, `${fileName}.${fileType}`);
   await Bun.write(filePath, arrayBuffer);
 
-  video.thumbnailURL = `http://localhost:${cfg.port}/assets/${videoId}.${fileType}`;
+  video.thumbnailURL = `http://localhost:${cfg.port}/assets/${fileName}.${fileType}`;
 
   updateVideo(cfg.db, video);
   return respondWithJSON(200, video);
