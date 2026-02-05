@@ -1,5 +1,5 @@
 import { respondWithJSON } from "./json";
-import { getFileType } from "./assets";
+import { getFileType, getVideoAspectRatio } from "./assets";
 import { type ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { unlink } from "fs/promises";
@@ -59,21 +59,23 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
   }
 
   const fileName = randomBytes(32).toString("base64url");
-  const key = `${fileName}.${fileType}`;
   const tempFilePath = path.join(cfg.assetsRoot, `${fileName}.${fileType}`);
   await Bun.write(tempFilePath, arrayBuffer);
+  let key;
 
   try {
     const localFile = Bun.file(tempFilePath);
+    const aspectRatio = await getVideoAspectRatio(tempFilePath);
+    key = `${aspectRatio}/${fileName}.${fileType}`;
     const s3File = cfg.s3Client.file(key);
     await s3File.write(localFile);
   } finally {
     await unlink(tempFilePath);
   }
 
-  const videoURL = `https://${cfg.s3Bucket}.s3.${cfg.s3Region}.amazonaws.com/${fileName}.${fileType}`;
+  const videoURL = `https://${cfg.s3Bucket}.s3.${cfg.s3Region}.amazonaws.com/${key}`;
   video.videoURL = videoURL;
   updateVideo(cfg.db, video);
 
-  return respondWithJSON(200, null);
+  return respondWithJSON(200, video);
 }
