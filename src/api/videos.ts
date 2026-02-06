@@ -3,6 +3,7 @@ import {
   getFileType,
   getVideoAspectRatio,
   processVideoForFastStart,
+  dbVideoToSignedVideo,
 } from "./assets";
 import { type ApiConfig } from "../config";
 import type { BunRequest } from "bun";
@@ -80,9 +81,8 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
     await unlink(tempProcessedFilePath);
   }
 
-  const videoURL = `https://${cfg.s3Bucket}.s3.${cfg.s3Region}.amazonaws.com/${key}`;
-  video.videoURL = videoURL;
+  video.videoURL = key;
   updateVideo(cfg.db, video);
 
-  return respondWithJSON(200, video);
+  return respondWithJSON(200, await dbVideoToSignedVideo(cfg, video));
 }
