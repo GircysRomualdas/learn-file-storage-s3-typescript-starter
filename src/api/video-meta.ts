@@ -1,5 +1,4 @@
 import { type ApiConfig } from "../config";
-import { dbVideoToSignedVideo } from "./assets";
 import { getBearerToken, validateJWT } from "../auth";
 import { createVideo, deleteVideo, getVideo, getVideos } from "../db/videos";
 import { respondWithJSON } from "./json";
@@ -56,7 +55,7 @@ export async function handlerVideoGet(cfg: ApiConfig, req: BunRequest) {
     throw new NotFoundError("Couldn't find video");
   }
 
-  return respondWithJSON(200, await dbVideoToSignedVideo(cfg, video));
+  return respondWithJSON(200, video);
 }
 
 export async function handlerVideosRetrieve(cfg: ApiConfig, req: Request) {
@@ -64,9 +63,5 @@ export async function handlerVideosRetrieve(cfg: ApiConfig, req: Request) {
   const userID = validateJWT(token, cfg.jwtSecret);
 
   const videos = getVideos(cfg.db, userID);
-  const signedVideos = await Promise.all(
-    videos.map((video) => dbVideoToSignedVideo(cfg, video)),
-  );
-
-  return respondWithJSON(200, signedVideos);
+  return respondWithJSON(200, videos);
 }
